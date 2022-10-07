@@ -80,9 +80,16 @@ class WindyGridworld(Env):
         else:
             return self.__pos
 
+
+    
+    def set_pos(self, pos_x, pos_y):
+        self.__pos = (pos_x, pos_y)
+        self.canvas = visualize(self)
+        
+        
     '''Takes an integer input which represents an action.
     Returns observation image, Reward, and terminal state marker as required by gym
-    '''
+    '''    
     def step(self, action):
 
         x, y = self.pos
@@ -110,7 +117,7 @@ class WindyGridworld(Env):
 
         if sum(self.claimed) == 0:
             done = True
-            self.claimed = np.ones(len(self.rewards))
+            #self.claimed = np.ones(len(self.rewards))
 
         # self.__pos = (x, y) if not done else None
         self.__pos = (x, y)
