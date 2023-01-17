@@ -97,18 +97,22 @@ def create_mlp(
     input_dim: int,
     output_dim: int,
     net_arch: List[int],
+    opt_val,
     activation_fn: Type[nn.Module] = nn.ReLU,
     squash_output: bool = False,
+
 ) -> List[nn.Module]:
     """
     Create a multi layer perceptron (MLP), which is
     a collection of fully-connected layers each followed by an activation function.
+
 
     :param input_dim: Dimension of the input vector
     :param output_dim:
     :param net_arch: Architecture of the neural net
         It represents the number of units per layer.
         The length of this list is the number of layers.
+    :param opt_val: Numerical Value of theoretical optimistic value for associated game/env
     :param activation_fn: The activation function
         to use after each layer.
     :param squash_output: Whether to squash the output using a Tanh
@@ -131,16 +135,20 @@ def create_mlp(
     nn.init.uniform_(final_layer.weight, a=0 , b=0.3)
     with th.no_grad():
         final_layer.bias.fill_(1.)'''
-
-
     if output_dim > 0:
         last_layer_dim = net_arch[-1] if len(net_arch) > 0 else input_dim
         modules.append(nn.Linear(last_layer_dim, output_dim))
         # Set bias to 1
         final_layer = modules[-1]
-        #nn.init.uniform_(final_layer.weight, a=0, b=0.01)
+
+        # Weight Change for final layer
+        # nn.init.uniform_(final_layer.weight, a=0, b=0.01)
         with th.no_grad():
-            final_layer.bias.fill_(1.)
+            # Set bias to optimistic value
+            opt_val = float(opt_val)
+            final_layer.bias.fill_(opt_val)
+            # Abs Val of weights
+            # final_layer.weight = nn.Parameter(th.abs(final_layer.weight))
 
         modules[-1] = final_layer
 

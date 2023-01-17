@@ -219,6 +219,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         self.policy = self.policy_class(  # pytype:disable=not-instantiable
             self.observation_space,
             self.action_space,
+            self.opt_val,
             self.lr_schedule,
             **self.policy_kwargs,  # pytype:disable=not-instantiable
         )

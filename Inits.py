@@ -6,9 +6,6 @@ import torch as th
 syspath.append(ospath.join(ospath.expanduser("~"), '/data/hashemi/Freetime/Freetime-DQN/Deep-Freetime/SB3_f'))
 
 import gym
-#from stable_baselines3 import DQN
-#from stable_baselines3.common.vec_env import DummyVecEnv
-#from stable_baselines3.common.evaluation import evaluate_policy
 from SB3_f.sb3f import DQN
 from SB3_f.sb3f.common.vec_env import DummyVecEnv
 from SB3_f.sb3f.common.evaluation import evaluate_policy
@@ -17,7 +14,7 @@ import torch as th
 from SB3_f.sb3f.common.utils import obs_as_tensor
 
 
-rewards = [[1, 0, 5]]
+rewards = [[3, 0, 5]]
 
 env = WindyGridworld(
         height=20,
@@ -28,8 +25,9 @@ env = WindyGridworld(
         reward_terminates_episode=False
     )
 
-
-model = DQN('CnnPolicy', env, verbose = 1)
+print(env.opt_val)
+opt_val = env.opt_val
+model = DQN('CnnPolicy', env, opt_val, verbose = 1)
 
 #evaluate_policy(model, env = model.env , n_eval_episodes=10, render=True)
 env.close()

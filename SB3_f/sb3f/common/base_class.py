@@ -385,8 +385,11 @@ class BaseAlgorithm(ABC):
             callback = CallbackList(callback)
 
         # Convert functional callback to object
-        if not isinstance(callback, BaseCallback):
+        if callback is None:
             callback = ConvertCallback(callback)
+        
+        #if not isinstance(callback, BaseCallback):
+        #    callback = ConvertCallback(callback)
 
         # Create eval callback in charge of the evaluation
         if eval_env is not None:

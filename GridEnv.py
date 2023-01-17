@@ -72,6 +72,7 @@ class WindyGridworld(Env):
         self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8)
 
 
+
     @property
     def pos(self):
         if self.__pos is None:
@@ -79,6 +80,11 @@ class WindyGridworld(Env):
 
         else:
             return self.__pos
+
+    @property
+    def opt_val(self):
+        max_r = np.array(self.rewards)[:, 0].max()
+        return max_r
 
 
     
@@ -188,7 +194,7 @@ def visualize(env, black_bar=True):
                 c = rgb_colors['green']
 
             else:
-                c = rgb_colors['blue']
+                c = rgb_colors['red']
             i = 0
             while i < 3:
                 canvas[x_ + 1, y_ + 1, i] = c[i]

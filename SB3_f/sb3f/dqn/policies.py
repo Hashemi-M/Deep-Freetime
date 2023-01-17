@@ -29,6 +29,7 @@ class QNetwork(BasePolicy):
 
     def __init__(
         self,
+        opt_val,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         features_extractor: nn.Module,
@@ -47,13 +48,16 @@ class QNetwork(BasePolicy):
         if net_arch is None:
             net_arch = [64, 64]
 
+        # set opt_val
+        self.opt_val = opt_val
+
         self.net_arch = net_arch
         self.activation_fn = activation_fn
         self.features_extractor = features_extractor
         self.features_dim = features_dim
         self.normalize_images = normalize_images
         action_dim = self.action_space.n  # number of actions
-        q_net = create_mlp(self.features_dim, action_dim, self.net_arch, self.activation_fn)
+        q_net = create_mlp(self.features_dim, action_dim, self.net_arch, self.opt_val, self.activation_fn)
         self.q_net = nn.Sequential(*q_net)
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
@@ -109,6 +113,7 @@ class DQNPolicy(BasePolicy):
         self,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
+        opt_val,
         lr_schedule: Schedule,
         net_arch: Optional[List[int]] = None,
         activation_fn: Type[nn.Module] = nn.ReLU,
@@ -132,7 +137,8 @@ class DQNPolicy(BasePolicy):
                 net_arch = []
             else:
                 net_arch = [64, 64]
-
+        # Set opt_val
+        self.opt_val = opt_val
         self.net_arch = net_arch
         self.activation_fn = activation_fn
         self.normalize_images = normalize_images
@@ -169,7 +175,7 @@ class DQNPolicy(BasePolicy):
     def make_q_net(self) -> QNetwork:
         # Make sure we always have separate networks for features extractors etc
         net_args = self._update_features_extractor(self.net_args, features_extractor=None)
-        return QNetwork(**net_args).to(self.device)
+        return QNetwork(self.opt_val, **net_args).to(self.device)
 
     def forward(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
         return self._predict(obs, deterministic=deterministic)
@@ -230,6 +236,7 @@ class CnnPolicy(DQNPolicy):
         self,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
+        opt_val,
         lr_schedule: Schedule,
         net_arch: Optional[List[int]] = None,
         activation_fn: Type[nn.Module] = nn.ReLU,
@@ -242,6 +249,7 @@ class CnnPolicy(DQNPolicy):
         super().__init__(
             observation_space,
             action_space,
+            opt_val,
             lr_schedule,
             net_arch,
             activation_fn,
@@ -251,6 +259,7 @@ class CnnPolicy(DQNPolicy):
             optimizer_class,
             optimizer_kwargs,
         )
+        self.opt_val = opt_val
 
 
 class MultiInputPolicy(DQNPolicy):

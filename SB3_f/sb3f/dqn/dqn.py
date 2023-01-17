@@ -73,6 +73,7 @@ class DQN(OffPolicyAlgorithm):
         self,
         policy: Union[str, Type[DQNPolicy]],
         env: Union[GymEnv, str],
+        opt_val,
         learning_rate: Union[float, Schedule] = 1e-4,
         buffer_size: int = 1_000_000,  # 1e6
         learning_starts: int = 50000,
@@ -124,6 +125,7 @@ class DQN(OffPolicyAlgorithm):
             support_multi_env=True,
         )
 
+        self.opt_val = opt_val
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction

@@ -304,6 +304,7 @@ class ConvertCallback(BaseCallback):
     def _on_step(self) -> bool:
         if self.callback is not None:
             return self.callback(self.locals, self.globals)
+            #return self.callback
         return True
 
 
