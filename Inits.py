@@ -14,7 +14,7 @@ import torch as th
 from SB3_f.sb3f.common.utils import obs_as_tensor
 
 
-rewards = [[3, 0, 5]]
+rewards = [[1, 0, 5]]
 
 env = WindyGridworld(
         height=20,
@@ -27,7 +27,7 @@ env = WindyGridworld(
 
 print(env.opt_val)
 opt_val = env.opt_val
-model = DQN('CnnPolicy', env, opt_val, verbose = 1)
+model = DQN('CnnPolicy', env, 0, verbose = 1)
 
 #evaluate_policy(model, env = model.env , n_eval_episodes=10, render=True)
 env.close()
@@ -86,12 +86,17 @@ for key in state_img_dict.keys():
         img_min[state[0], state[1]] = min_val
         img_mean[state[0], state[1]] = mean_val
 
-#plt.imshow(img_mean, cmap='jet')
-#plt.title("mean Q val")
-#plt.colorbar()
-#plt.show()
+print(img_max.shape)
+plt.imshow(img_max, cmap='jet',vmax=1,vmin=-.10)
+plt.title("DQN Network")
+plt.colorbar()
+plt.savefig("untrained_vanilla.png")
+plt.show()
+
 
 print(np.min(img_min), np.max(img_max))
+
+
 
 
 

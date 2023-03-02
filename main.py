@@ -40,7 +40,7 @@ def main(baseline = False, env_num=1, steps=1000000, exp_frac=0.3, callback=True
 
     if baseline:
         pass
-        # run baseline
+        run_baseline(env, env_num, steps, exp_frac, callback, exp_final)
 
 
 if __name__ == '__main__':
