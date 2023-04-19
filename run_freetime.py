@@ -9,9 +9,9 @@ from SB3_f.sb3f import DQN
 
 from SB3_f.sb3f.common.evaluation import evaluate_policy
 from SB3_f.sb3f.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
-from Net_Qtable import Network_Qtable
+from Net_Qtable import Network_Qtable, Network_Ftable
 
-def run_opt(env, env_num, steps, exp_frac, callback, exp_final):
+def run_freetime(env, opt_val, env_num, steps, exp_frac, callback, exp_final):
     # rendering env
     episodes = 5
     for episode in range(1, episodes + 1):
@@ -29,11 +29,13 @@ def run_opt(env, env_num, steps, exp_frac, callback, exp_final):
 
     # Define save paths
     save_path = os.path.join('Training', 'Saved Models')
-    log_path = os.path.join('Training', 'Logs Bias Only', 'Env '+str(env_num))
+    log_path = os.path.join('Training', 'Logs_F_with_Opt', 'Env '+str(env_num))
     log_name = 'Env{}_{}Steps_{}exp'.format(env_num, steps, exp_frac)
 
+
     # Create model
-    model = DQN('CnnPolicy', env, exploration_fraction=exp_frac,
+    opt_val = opt_val
+    model = DQN('CnnPolicy', env, opt_val, exploration_fraction=exp_frac,
                 exploration_final_eps=exp_final,
                 learning_starts=100000, verbose=1,
                 buffer_size=50000, target_update_interval=1000,
@@ -42,15 +44,16 @@ def run_opt(env, env_num, steps, exp_frac, callback, exp_final):
     # Get initial Q Table
     init_table = Network_Qtable(model, env)
     plt.imshow(init_table, cmap='jet')
-    plt.title("Env " + str(env_num) + " Opt Start")
+    plt.title("Env " + str(env_num) + " Freetime Start")
     plt.colorbar()
-    img_save_path =os.path.join('Q-Plot', "Env " + str(env_num) + " Opt Start")
+    img_save_path =os.path.join('Q-Plot', 'Freetime', "Env " + str(env_num) + " Freetime Start")
     plt.savefig(img_save_path)
+    plt.clf()
 
 
     # Check if callback is used, Train model
     if callback:
-        stop_callback = StopTrainingOnRewardThreshold(reward_threshold=3, verbose=1)
+        stop_callback = StopTrainingOnRewardThreshold(reward_threshold=1000, verbose=1)
         eval_callback = EvalCallback(env,
                                      callback_on_new_best=stop_callback,
                                      eval_freq=10000,
@@ -65,14 +68,24 @@ def run_opt(env, env_num, steps, exp_frac, callback, exp_final):
     save_path = os.path.join('Training', 'Saved Models', 'Env{}_{}Steps_{}exp'.format(env_num, steps, exp_frac))
     model.save(save_path)
 
-    # Get final Q table
+
     final_table = Network_Qtable(model, env)
     plt.imshow(final_table, cmap='jet')
-    plt.title("Env " + str(env_num) + " Opt End")
+    plt.title("Env " + str(env_num) + " Q-Table Freetime End")
     plt.colorbar()
-    img_save_path = os.path.join('Q-Plot', "Env " + str(env_num) + " Opt End")
+    img_save_path = os.path.join('Q-Plot', "Env_" + str(env_num) + "_QT_Freetime_End")
     plt.savefig(img_save_path)
+    plt.clf()
 
+
+    # Get final Q table
+    final_table = Network_Ftable(model, env)
+    plt.imshow(final_table, cmap='jet')
+    plt.title("Env " + str(env_num) + " F-Table Freetime End")
+    plt.colorbar()
+    img_save_path = os.path.join('Q-Plot', "Env_" + str(env_num) + "_FT_Freetime_End")
+    plt.savefig(img_save_path)
+    plt.clf()
 
 
 

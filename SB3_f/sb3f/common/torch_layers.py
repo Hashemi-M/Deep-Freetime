@@ -138,19 +138,21 @@ def create_mlp(
     if output_dim > 0:
         last_layer_dim = net_arch[-1] if len(net_arch) > 0 else input_dim
         modules.append(nn.Linear(last_layer_dim, output_dim))
-        # Set bias to 1
-        final_layer = modules[-1]
 
-        # Weight Change for final layer
-        # nn.init.uniform_(final_layer.weight, a=0, b=0.01)
-        with th.no_grad():
-            # Set bias to optimistic value
-            opt_val = float(opt_val)
-            final_layer.bias.fill_(opt_val)
-            # Abs Val of weights
-            # final_layer.weight = nn.Parameter(th.abs(final_layer.weight))
+        if opt_val is not None:
+            # Set bias to 1
+            final_layer = modules[-1]
 
-        modules[-1] = final_layer
+            # Weight Change for final layer
+            # nn.init.uniform_(final_layer.weight, a=0, b=0.01)
+            with th.no_grad():
+                # Set bias to optimistic value
+                opt_val = float(opt_val)
+                final_layer.bias.fill_(opt_val)
+                # Abs Val of weights
+                # final_layer.weight = nn.Parameter(th.abs(final_layer.weight))
+
+            modules[-1] = final_layer
 
     if squash_output:
         modules.append(nn.Tanh())

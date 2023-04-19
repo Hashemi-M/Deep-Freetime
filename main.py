@@ -1,5 +1,5 @@
 from GridEnv import WindyGridworld
-from run_opt import run_opt
+from run_freetime import run_freetime
 
 def gen_env(env_num):
     if env_num == 1:
@@ -30,17 +30,19 @@ def gen_env(env_num):
         )
     return env
 
-def main(baseline = False, env_num=1, steps=1000000, exp_frac=0.3, callback=True, exp_final = 0.1):
+def main(baseline = False, env_num=1, steps=1000000, exp_frac=0.3, callback=True,exp_final = 0.1, opt_val=1, runs=1):
     # Create Env
     env = gen_env(env_num)
     # run optimist
-    run_opt(env, env_num, steps, exp_frac, callback, exp_final)
+    run = 0
+    while run < runs:
+        run_freetime(env, opt_val, env_num, steps, exp_frac, callback, exp_final)
 
 
 
     if baseline:
         pass
-        run_baseline(env, env_num, steps, exp_frac, callback, exp_final)
+        #run_baseline(env, env_num, steps, exp_frac, callback, exp_final)
 
 
 if __name__ == '__main__':
@@ -52,6 +54,6 @@ if __name__ == '__main__':
     exp_frac = 0.8
     callback = True
     exp_final = 0.1
-
-
-    main(baseline, env_num, steps, exp_frac, callback, exp_final)
+    opt_val = 1
+    runs = 3
+    main(baseline, env_num, steps, exp_frac, callback, exp_final, opt_val, runs)

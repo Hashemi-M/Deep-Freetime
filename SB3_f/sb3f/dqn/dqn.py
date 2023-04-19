@@ -139,6 +139,9 @@ class DQN(OffPolicyAlgorithm):
         self.exploration_schedule = None
         self.q_net, self.q_net_target = None, None
 
+        # Freetime network
+        self.f_net, self.f_net_target = None, None
+
         if _init_setup_model:
             self._setup_model()
 
@@ -148,6 +151,10 @@ class DQN(OffPolicyAlgorithm):
         # Copy running stats, see GH issue #996
         self.batch_norm_stats = get_parameters_by_name(self.q_net, ["running_"])
         self.batch_norm_stats_target = get_parameters_by_name(self.q_net_target, ["running_"])
+        # Freetime batch norm stats
+        self.batch_norm_stats_f = get_parameters_by_name(self.f_net, ["running_"])
+        self.batch_norm_stats_target_f = get_parameters_by_name(self.f_net_target, ["running_"])
+
         self.exploration_schedule = get_linear_fn(
             self.exploration_initial_eps,
             self.exploration_final_eps,
@@ -169,6 +176,8 @@ class DQN(OffPolicyAlgorithm):
     def _create_aliases(self) -> None:
         self.q_net = self.policy.q_net
         self.q_net_target = self.policy.q_net_target
+        self.f_net = self.policy.f_net
+        self.f_net_target = self.policy.f_net_target
 
     def _on_step(self) -> None:
         """
@@ -178,8 +187,10 @@ class DQN(OffPolicyAlgorithm):
         self._n_calls += 1
         if self._n_calls % self.target_update_interval == 0:
             polyak_update(self.q_net.parameters(), self.q_net_target.parameters(), self.tau)
+            polyak_update(self.f_net.parameters(), self.f_net_target.parameters(), self.tau)
             # Copy running stats, see GH issue #996
             polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
+            polyak_update(self.batch_norm_stats_f, self.batch_norm_stats_target_f, 1.0)
 
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
@@ -195,6 +206,19 @@ class DQN(OffPolicyAlgorithm):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
 
+            # Get current Q-values estimates
+            current_q_values = self.q_net(replay_data.observations)
+            # Create detached copy of current q values for to later compute freetime reward
+            current_q_copy = current_q_values.clone().detach()
+            # Retrieve the q-values for the actions from the replay buffer
+            current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+
+            # Get current F-values estimates
+            current_f_values = self.f_net(replay_data.observations)
+            # Retrieve the f-values for the actions from the replay buffer
+            current_f_values = th.gather(current_f_values, dim=1, index=replay_data.actions.long())
+
+
             with th.no_grad():
                 # Compute the next Q-values using the target network
                 next_q_values = self.q_net_target(replay_data.next_observations)
@@ -205,19 +229,49 @@ class DQN(OffPolicyAlgorithm):
                 # 1-step TD target
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
-            # Get current Q-values estimates
-            current_q_values = self.q_net(replay_data.observations)
 
-            # Retrieve the q-values for the actions from the replay buffer
-            current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+                # Freetime calculation
+                # Copy target: since we compare the value r + gamma* q(s_2,a') where a' is max action
+                target_q_copy = target_q_values.clone().detach()
+
+                # Get max q-value across all actions in the current observation
+                current_q_copy, _ = current_q_copy.max(dim=1)
+                current_q_copy = current_q_copy.reshape(-1, 1)
+
+                new_q = replay_data.rewards + next_q_values
+                # freetime reward: 1 target_q is greater than current q, ie 1 if we didn't lose out on reward
+                freetime_rewards = th.ge(target_q_copy, current_q_copy).int()
+                #freetime_rewards = th.ge(new_q,current_q_copy).int()
+
+
+                # Compute the next F-values using the target network
+                next_f_values = self.f_net_target(replay_data.next_observations)
+                # Follow greedy policy: use the one with the highest value
+                next_f_values, _ = next_f_values.max(dim=1)
+                # Avoid potential broadcast issue
+                next_f_values = next_f_values.reshape(-1, 1)
+                # Freetime target
+                freetime_target = freetime_rewards * (freetime_rewards + next_f_values)
+
+
+                # Fix terminal state freetime
+                fix_index_rew = th.where((replay_data.dones > 0) & (replay_data.rewards > 0))
+                fix_index_no_rew = th.where((replay_data.dones > 0) & (replay_data.rewards <= 0))
+
+                freetime_target[fix_index_rew] = 1
+                freetime_target[fix_index_no_rew] = 0
 
             # Compute Huber loss (less sensitive to outliers)
             loss = F.smooth_l1_loss(current_q_values, target_q_values)
             losses.append(loss.item())
 
+            # Loss for freetime
+            loss_f = F.smooth_l1_loss(current_f_values, freetime_target)
+
             # Optimize the policy
             self.policy.optimizer.zero_grad()
             loss.backward()
+            loss_f.backward()
             # Clip gradient norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
@@ -255,6 +309,7 @@ class DQN(OffPolicyAlgorithm):
             else:
                 action = np.array(self.action_space.sample())
         else:
+            # policy.predict
             action, state = self.policy.predict(observation, state, episode_start, deterministic)
         return action, state
 

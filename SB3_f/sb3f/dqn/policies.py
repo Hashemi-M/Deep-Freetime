@@ -75,6 +75,19 @@ class QNetwork(BasePolicy):
         action = q_values.argmax(dim=1).reshape(-1)
         return action
 
+    def _predict_f(self, observation: th.Tensor, deterministic: bool = True) -> th.Tensor:
+        f_values = self(observation)
+
+        # index of freeactions
+        free_actions = th.where(f_values > 1)[1].reshape(-1)
+        # Check if free_actions is empty or not: if any action has freetime
+        f_action = None
+        if free_actions.size(0) > 0:
+            rand_idx = th.randperm(free_actions.size(0))[:1]
+
+            f_action = free_actions[rand_idx]
+        return f_action
+
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
 
@@ -152,7 +165,62 @@ class DQNPolicy(BasePolicy):
         }
 
         self.q_net, self.q_net_target = None, None
+        self.f_net, self.f_net_target = None, None
         self._build(lr_schedule)
+
+    def predict(
+        self,
+        observation,
+        state = None,
+        episode_start = None,
+        deterministic = False):
+        """
+        Overwriting the predict for freetime DQN
+
+        Get the policy action from an observation (and optional hidden state).
+        Includes sugar-coating to handle different observations (e.g. normalizing images).
+
+        :param observation: the input observation
+        :param state: The last hidden states (can be None, used in recurrent policies)
+        :param episode_start: The last masks (can be None, used in recurrent policies)
+            this correspond to beginning of episodes,
+            where the hidden states of the RNN must be reset.
+        :param deterministic: Whether or not to return deterministic actions.
+        :return: the model's action and the next hidden state
+            (used in recurrent policies)
+        """
+
+        self.set_training_mode(False)
+
+        observation, vectorized_env = self.obs_to_tensor(observation)
+
+        with th.no_grad():
+            # best action according to qnetwork
+            actions = self._predict(observation, deterministic=deterministic)
+            # action chosen by f network, None if there is no action with F >= 1
+            f_actions = self._predict_f(observation, deterministic=deterministic)
+
+        # If F network chose an action then use that one
+        if f_actions is not None:
+            actions = f_actions
+        # Convert to numpy, and reshape to the original action shape
+        actions = actions.cpu().numpy().reshape((-1,) + self.action_space.shape)
+
+        if isinstance(self.action_space, gym.spaces.Box):
+            if self.squash_output:
+                # Rescale to proper domain when using squashing
+                actions = self.unscale_action(actions)
+            else:
+                # Actions could be on arbitrary scale, so clip the actions to avoid
+                # out of bound error (e.g. if sampling from a Gaussian distribution)
+                actions = np.clip(actions, self.action_space.low, self.action_space.high)
+
+        # Remove batch dimension if needed
+        if not vectorized_env:
+            actions = actions.squeeze(axis=0)
+
+        return actions, state
+
 
     def _build(self, lr_schedule: Schedule) -> None:
         """
@@ -169,9 +237,21 @@ class DQNPolicy(BasePolicy):
         self.q_net_target.load_state_dict(self.q_net.state_dict())
         self.q_net_target.set_training_mode(False)
 
+        # Make F network
+        self.f_net = self.make_f_net()
+        self.f_net_target = self.make_f_net()
+        self.f_net_target.load_state_dict(self.f_net.state_dict())
+        self.f_net_target.set_training_mode(False)
+
         # Setup optimizer with initial learning rate
+        db = self.parameters()
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
+    def make_f_net(self) -> QNetwork:
+        # Make sure we always have separate networks for features extractors etc
+        net_args = self._update_features_extractor(self.net_args, features_extractor=None)
+        # Instead of opt val, send 1 as bias. Since we want innit F-values at 1
+        return QNetwork(1.05, **net_args).to(self.device)
     def make_q_net(self) -> QNetwork:
         # Make sure we always have separate networks for features extractors etc
         net_args = self._update_features_extractor(self.net_args, features_extractor=None)
@@ -182,6 +262,9 @@ class DQNPolicy(BasePolicy):
 
     def _predict(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
         return self.q_net._predict(obs, deterministic=deterministic)
+
+    def _predict_f(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
+        return self.f_net._predict_f(obs, deterministic=deterministic)
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
@@ -208,6 +291,7 @@ class DQNPolicy(BasePolicy):
         :param mode: if true, set to training mode, else set to evaluation mode
         """
         self.q_net.set_training_mode(mode)
+        self.f_net.set_training_mode(mode)
         self.training = mode
 
 

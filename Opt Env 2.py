@@ -7,7 +7,6 @@ syspath.append(ospath.join(ospath.expanduser("~"), '/data/hashemi/Freetime/Freet
 
 
 import torch as torch
-torch._C._cuda_getDeviceCount() > 0
 
 import os
 import gym 
@@ -67,53 +66,20 @@ eval_callback = EvalCallback(env,
                              verbose=1)
 
 
-# In[8]:
 
+opt_val = env.opt_val
+model = DQN('CnnPolicy', env, opt_val, exploration_fraction=0.2,
+  exploration_final_eps=0.1,learning_starts=1000, verbose = 1, buffer_size = 50000,target_update_interval=1000, tensorboard_log=log_path)
 
-# try 0.2 exploration period
-model = DQN('CnnPolicy', env, exploration_fraction=0.2,
-  exploration_final_eps=0.1,learning_starts=100000, verbose = 1, buffer_size = 50000,target_update_interval=1000, tensorboard_log=log_path)
-
-
-# In[9]:
-
-
-from SB3_f.sb3f.common.utils import obs_as_tensor
-device = torch.device('cuda:0')
-
-obs = env.canvas
-plt.imshow(obs)
-
-
-# Check the Network Q Value
-observation = np.transpose(obs, (2, 0, 1))
-observation = observation[np.newaxis, ...]
-observation = obs_as_tensor(observation, device)
-with torch.no_grad():
-        q_values = model.q_net(observation)
-
-
-# In[10]:
-
-
-q_values
-
-
-# In[11]:
 
 
 model.learn(total_timesteps=1000000,callback=eval_callback, tb_log_name='Env2_0.2exp_1M')
 
 
-# In[ ]:
 
 
 save_path = os.path.join('Training', 'Saved Models', 'Env2_Opt_BaisOnly_1M')
 model.save(save_path)
-
-
-# In[ ]:
-
 
 del(model)
 
